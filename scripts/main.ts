@@ -22,20 +22,13 @@ function sendBehaviorData(data: any) {
   request.body = JSON.stringify(data);
   http
     .request(request)
-    .then((response) => {
-      //world.say(response.body);
-    })
-    .catch((error) => {
-      //world.say(error);
-    });
+    .then((response) => {})
+    .catch((error) => {});
 }
 
 world.events.itemStartUseOn.subscribe(async (v) => {
   let location = v.blockLocation;
-  //world.say(`Start ${location.x}, ${location.y}, ${location.z}`);
-  //if (world.getDimension("overworld").getBlock(v.blockLocation).getComponent("inventory") != undefined) {
   let block = world.getDimension("overworld").getBlock(location);
-  //world.say(`Start ${block.typeId}`);
   let blockComponent: BlockInventoryComponent = block.getComponent("inventory");
   if (blockComponent != undefined) {
     let toSendData = {
@@ -58,18 +51,14 @@ world.events.itemStartUseOn.subscribe(async (v) => {
       },
     };
     let blockContainer = blockComponent.container;
-    //world.say(`Size: ${blockContainer.size}`);
     let blockItems = [];
-    //let sayStr = "箱子物品栏: ";
     for (let i = 0; i < blockContainer.size; i++) {
       if (blockContainer.getItem(i) != undefined) {
-        //world.say(`Start ${i} ${blockContainer.getItem(i).typeId}`);
         blockItems[i] = {
           soltId: i,
           typeId: blockContainer.getItem(i).typeId,
           amount: blockContainer.getItem(i).amount,
         };
-        //sayStr += ` ${i}:${items[i].typeId}(${items[i].amount})`;
       }
     }
     toSendData.data.block.blockItems = blockItems as never[];
@@ -80,7 +69,6 @@ world.events.itemStartUseOn.subscribe(async (v) => {
       if (playerInventory != undefined) {
         let playerContainer = playerInventory.container;
         let playerItems = [];
-        //sayStr += `\n玩家 ${(v.source as Player).name} 物品栏: `;
         for (let i = 0; i < playerContainer.size; i++) {
           if (playerContainer.getItem(i) != undefined) {
             playerItems[i] = {
@@ -88,12 +76,10 @@ world.events.itemStartUseOn.subscribe(async (v) => {
               typeId: playerContainer.getItem(i).typeId,
               amount: playerContainer.getItem(i).amount,
             };
-            //sayStr += ` ${i}:${items[i].typeId}(${items[i].amount})`;
           }
         }
         toSendData.data.player.playerItems = playerItems as never[];
       }
-      //world.say(JSON.stringify(toSendData));
       sendBehaviorData(toSendData);
     }
   }
@@ -110,7 +96,7 @@ world.events.blockBreak.subscribe(async (v) => {
           y: v.block.location.y,
           z: v.block.location.z,
         },
-        typeId: v.block.typeId,
+        typeId: v.brokenBlockPermutation.type.id,
       },
       player: {
         name: v.player.name,
