@@ -9,13 +9,15 @@ import {
   InventoryComponentContainer,
   EntityInventoryComponent,
   ItemStack,
+  EffectType,
 } from "@minecraft/server";
 import { http, HttpClient, HttpHeader, HttpRequest, HttpResponse, HttpRequestMethod } from "@minecraft/server-net";
-import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
+import { ActionFormData, MessageFormData, ModalFormData } from "@minecraft/server-ui";
+import { variables } from "@minecraft/server-admin";
 
-const toSendHttpUrl = "http://115.227.16.166:19144";
+const toSendHttpUrl = "http://115.227.16.166:19144/";
 
-function sendBehaviorData(data: any) {
+async function sendBehaviorData(data: any) {
   let request = new HttpRequest(toSendHttpUrl);
   request.method = HttpRequestMethod.POST;
   request.addHeader("content-type", "application/json");
@@ -26,9 +28,103 @@ function sendBehaviorData(data: any) {
     .catch((error) => {});
 }
 
+async function sendActionData(data: any): Promise<string> {
+  let request = new HttpRequest(toSendHttpUrl + "action");
+  request.method = HttpRequestMethod.POST;
+  request.addHeader("content-type", "application/json");
+  request.body = JSON.stringify(data);
+  let result = "";
+  await http
+    .request(request)
+    .then((response) => {
+      result = response.body;
+    })
+    .catch((error) => {
+      result = error;
+    });
+
+  return result;
+}
+
+// world.events.beforeChat.subscribe(async (v) => {
+//   world.say(v.message);
+// });
+
+// world.events.messageReceive.subscribe(async (v) => {
+//   world.say(v.message);
+//   world.say(v.id);
+// });
+
+const homeMenu = new ActionFormData();
+homeMenu.title("家书菜单").button("设置家").body("在当前位置设置家").button("回家");
+
+world.events.beforeItemUse.subscribe(async (v) => {
+  if (v.item.typeId == "minecraft:book") {
+    if (v.item.nameTag == "家书") {
+      let player = v.source as Player;
+      let homeMenuResult = await homeMenu.show(player as any);
+      if (homeMenuResult.selection != undefined) {
+        let messageBox = new MessageFormData();
+        messageBox.button1("是的").button2("没有其他选择了");
+        switch (homeMenuResult.selection) {
+          case 0:
+            messageBox.title("设置家结果");
+            let playerName = player.name;
+            let dimension = player.dimension.id;
+            let location = player.location;
+            location.x = Math.floor(location.x);
+            location.y = Math.floor(location.y);
+            location.z = Math.floor(location.z);
+            if (dimension != "minecraft:overworld") {
+              messageBox.body("错误: 只能在主世界设置家!");
+            } else {
+              let toSendData = {
+                type: "homeSetAction",
+                data: {
+                  playerName: playerName,
+                  location: location,
+                },
+              };
+              let result = await sendActionData(toSendData);
+              messageBox.body(result);
+            }
+            messageBox.show(player as any);
+            break;
+          case 1:
+            messageBox.title("回家结果");
+            let toSendData = {
+              type: "homeGetAction",
+              data: {
+                playerName: player.name,
+              },
+            };
+            let result = await sendActionData(toSendData);
+            if (result != "") {
+              messageBox.body(result);
+              messageBox.show(player as any);
+              let homeLocation = JSON.parse(result);
+              player.teleport(homeLocation, world.getDimension("overworld"), 0, 0);
+            } else {
+              messageBox.body("错误: 清检查你是否设置了家!");
+              messageBox.show(player as any);
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  }
+});
+
+// world.events.entityHurt.subscribe(async (v) => {
+//   world.say(v.hurtEntity.typeId);
+//   v.hurtEntity.kill();
+// });
+
 world.events.itemStartUseOn.subscribe(async (v) => {
   let location = v.blockLocation;
-  let block = world.getDimension("overworld").getBlock(location);
+  let block = v.source.dimension.getBlock(location);
   let blockComponent: BlockInventoryComponent = block.getComponent("inventory");
   if (blockComponent != undefined) {
     let toSendData = {
@@ -82,6 +178,25 @@ world.events.itemStartUseOn.subscribe(async (v) => {
       }
       sendBehaviorData(toSendData);
     }
+  } else {
+    let toSendData = {
+      type: "blockUse",
+      data: {
+        block: {
+          location: {
+            dimension: block.dimension.id,
+            x: block.location.x,
+            y: block.location.y,
+            z: block.location.z,
+          },
+          typeId: block.type.id,
+        },
+        player: {
+          name: (v.source as Player).name,
+        },
+      },
+    };
+    sendBehaviorData(toSendData);
   }
 });
 
